@@ -53,9 +53,9 @@ class Plugin {
             return;
         }
 
-        $this->paddle      = new Paddle_Client();
-        $this->gateway     = new Vendor_Subscription_Gateway( $this->paddle );
+        $this->paddle       = new Paddle_Client();
+        $this->gateway      = new Vendor_Subscription_Gateway( $this->paddle );
         $this->dashboard_ui = new Dashboard_UI( $this->gateway );
-        $this->webhooks    = new Webhook_Handler( $this->gateway );
+        $this->webhooks     = new Webhook_Handler( $this->gateway );
     }
 }

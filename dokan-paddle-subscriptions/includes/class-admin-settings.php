@@ -21,6 +21,7 @@ class Admin_Settings {
             'mode'           => 'sandbox',
             'api_key'        => '',
             'webhook_secret' => '',
+            'client_token'   => '',
         ];
 
         $saved = get_option( self::OPTION_KEY, [] );
@@ -128,7 +129,7 @@ class Admin_Settings {
             return;
         }
 
-        if ( ! wp_verify_nonce( $_POST['dpvs_nonce'], 'dpvs_save_settings' ) ) {
+        if ( ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['dpvs_nonce'] ) ), 'dpvs_save_settings' ) ) {
             return;
         }
 
@@ -136,7 +137,7 @@ class Admin_Settings {
             return;
         }
 
-        $raw = isset( $_POST['dpvs_settings'] ) ? (array) $_POST['dpvs_settings'] : [];
+        $raw = isset( $_POST['dpvs_settings'] ) ? array_map( 'sanitize_text_field', wp_unslash( (array) $_POST['dpvs_settings'] ) ) : [];
 
         $settings = [
             'enabled'        => ! empty( $raw['enabled'] ) ? '1' : '0',

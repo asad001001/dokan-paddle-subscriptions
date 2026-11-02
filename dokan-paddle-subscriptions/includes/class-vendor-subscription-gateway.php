@@ -34,20 +34,9 @@ class Vendor_Subscription_Gateway {
      * On Dokan subscription pack save, create (or update) Paddle product + price.
      */
     public function handle_pack_saved( $product_id ) {
-        
-       
-        
         if ( ! class_exists( SubscriptionHelper::class ) ) {
             return;
         }
-        
-        // // Only for recurring packs
-        // if ( ! SubscriptionHelper::is_recurring_subscription_product( $product_id ) ) {
-        //     return;
-        // }
-
-
-
 
         $pack = new SubscriptionPack( $product_id, 0 );
 
@@ -55,14 +44,11 @@ class Vendor_Subscription_Gateway {
         $interval_count = (int) $pack->get_recurring_interval();
         $interval_unit  = $pack->get_period_type(); // day|week|month|year
         $pack_title     = $pack->get_package_title();
-         
-        $isrecurring = $pack->is_recurring();
-        
-        $price_trail = $pack->is_trial();
-        $price_trail_inerval = $pack->get_trial_period_types();
-        $price_trail_freq = $pack->get_trial_range();
-        
-        
+        $is_recurring   = $pack->is_recurring();
+        $has_trial      = $pack->is_trial();
+        $trial_interval = $pack->get_trial_period_types();
+        $trial_freq     = $pack->get_trial_range();
+
         if ( $amount <= 0 || ! $interval_unit ) {
             return;
         }
@@ -78,13 +64,11 @@ class Vendor_Subscription_Gateway {
                 $amount,
                 $interval_count,
                 $interval_unit,
-                $price_trail,
-                $price_trail_inerval,
-                $price_trail_freq,
-                $isrecurring
+                $has_trial,
+                $trial_interval,
+                $trial_freq,
+                $is_recurring
             );
-
-
         } else {
             // You can implement update logic if Paddle supports it; for now just skip
             return;
@@ -109,11 +93,19 @@ class Vendor_Subscription_Gateway {
     }
 
     /**
-     * Handle Paddle webhook: subscription activated.
+     * Paddle Billing sends custom_data inside "data"; older payloads had it top-level.
+     */
+    protected function get_custom_data( array $payload ) {
+        $custom = $payload['data']['custom_data'] ?? ( $payload['custom_data'] ?? [] );
+
+        return is_array( $custom ) ? $custom : [];
+    }
+
+    /**
+     * Handle Paddle webhook: subscription activated (or trial started).
      */
     public function handle_webhook_activated( array $payload ) {
-        // print_r($payload);
-        $custom = $payload['custom_data'] ?? [];
+        $custom = $this->get_custom_data( $payload );
 
         $vendor_id      = isset( $custom['user_id'] ) ? absint( $custom['user_id'] ) : 0;
         $pack_id        = isset( $custom['pack_id'] ) ? absint( $custom['pack_id'] ) : 0;
@@ -125,7 +117,7 @@ class Vendor_Subscription_Gateway {
             return;
         }
 
-        if ( 'active' !== $status ) {
+        if ( ! in_array( $status, [ 'active', 'trialing' ], true ) ) {
             return;
         }
 
@@ -152,7 +144,7 @@ class Vendor_Subscription_Gateway {
      * Handle Paddle webhook: subscription renewed.
      */
     public function handle_webhook_renewed( array $payload ) {
-        $custom       = $payload['custom_data'] ?? [];
+        $custom       = $this->get_custom_data( $payload );
         $vendor_id    = isset( $custom['user_id'] ) ? absint( $custom['user_id'] ) : 0;
         $pack_id      = isset( $custom['pack_id'] ) ? absint( $custom['pack_id'] ) : 0;
         $next_billed  = $payload['data']['next_billed_at'] ?? '';
@@ -173,7 +165,7 @@ class Vendor_Subscription_Gateway {
      * Handle Paddle webhook: subscription cancelled.
      */
     public function handle_webhook_cancelled( array $payload ) {
-        $custom    = $payload['custom_data'] ?? [];
+        $custom    = $this->get_custom_data( $payload );
         $vendor_id = isset( $custom['user_id'] ) ? absint( $custom['user_id'] ) : 0;
 
         if ( ! $vendor_id ) {
