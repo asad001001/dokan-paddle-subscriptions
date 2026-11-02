@@ -129,22 +129,21 @@ $subscription_id = $subscription['subscription_id'] ?? '';
     <?php do_action( 'dokan_dashboard_content_after' ); ?>
 </div>
 <?php do_action( 'dokan_dashboard_wrap_end' ); 
-// print_r($settings)
 
 
 
 ?>
  <script src="https://cdn.paddle.com/paddle/v2/paddle.js"></script>
     <script>
-    <?php if($settings['enabled']){ ?>
-    
-        Paddle.Environment.set('<?= $settings['mode']; ?>');
+    <?php if ( '1' === $settings['enabled'] ) : ?>
+        <?php if ( 'sandbox' === $settings['mode'] ) : ?>
+        Paddle.Environment.set('sandbox');
+        <?php endif; ?>
 
         Paddle.Initialize({
-            token: '<?= $settings['client_token']; ?>'
+            token: '<?php echo esc_js( $settings['client_token'] ); ?>'
         });
-        
-        <?php } ?>
+    <?php endif; ?>
     </script>
         
 <style>

@@ -1,9 +1,6 @@
 (function($) {
 
-  // You must include Paddle's JS SDK somewhere in your site:
-  // <script src="https://cdn.paddle.com/paddle.js"></script>
-  // and initialize it here:
-  // Paddle.Setup({ vendor: YOUR_VENDOR_ID, environment: 'sandbox' or 'production' });
+  // Paddle.js v2 is loaded and initialised in templates/vendor-subscription-status.php.
 
   $(document).on('click', '.dpvs-pack-button', function(e) {
     e.preventDefault();
@@ -23,9 +20,7 @@
       items: [{
         price_id: priceId,
         quantity: 1
-        
       }],
-      currency:'PKR',
       customer: {
         email: DPVS.currentEmail
       },
@@ -34,10 +29,9 @@
         pack_id: packId,
         action: action
       },
-      successCallback: function (data) {
-        // For UX only. Final subscription status is updated via webhooks.
-        // You can show a message or reload:
-        window.location.href = window.location.href;
+      successCallback: function () {
+        // UX only. The real subscription state is set by the webhook.
+        window.location.reload();
       }
     });
   });

@@ -8,21 +8,18 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class Paddle_Client {
 
-   protected $api_key;
+    const SANDBOX_URL = 'https://sandbox-api.paddle.com';
+    const LIVE_URL    = 'https://api.paddle.com';
+
+    protected $api_key;
     protected $mode;
     protected $base_url;
 
     public function __construct() {
-      $settings       = Admin_Settings::get_settings();
+        $settings       = Admin_Settings::get_settings();
         $this->api_key  = $settings['api_key'];
         $this->mode     = $settings['mode'];
-
-        // You can change base URL depending on mode if Paddle distinguishes sandbox vs live endpoints
-        if($this->mode == 'sandbox'){
-            $this->base_url = 'https://sandbox-api.paddle.com/';
-        }else{
-            $this->base_url = 'https://api.paddle.com';
-        }
+        $this->base_url = ( 'sandbox' === $this->mode ) ? self::SANDBOX_URL : self::LIVE_URL;
     }
 
     protected function post( $path, array $body ) {
@@ -50,24 +47,22 @@ class Paddle_Client {
 
         return [
             'success' => false,
-            'error'   => isset( $data['error'] ) ? $data['error'] : 'Unknown error',
+            'error'   => $data['error']['detail'] ?? 'Paddle API error (HTTP ' . $code . ')',
             'data'    => $data,
         ];
     }
 
     /**
-     * Create a product + recurring price for a Dokan pack.
-     * You must adapt payload to your Paddle Billing schema.
+     * Create a Paddle product + price for a Dokan subscription pack.
+     *
+     * @return array{success:bool, data?:array, error?:string}
      */
-    public function create_product_and_price_for_pack( $wp_product_id, $name, $amount, $interval_count, $interval_unit,$price_trail,$price_trail_inerval,$price_trail_freq, $isrecurring ) {
-        
-
-        // 1. Create product
+    public function create_product_and_price_for_pack( $wp_product_id, $name, $amount, $interval_count, $interval_unit, $has_trial, $trial_interval, $trial_freq, $is_recurring ) {
+        // 1. Create product.
         $product_payload = [
-            'name'        => $name,
-            "tax_category" => "standard",
-            'description' => 'Dokan vendor subscription pack #' . $wp_product_id,
-            
+            'name'         => $name,
+            'tax_category' => 'standard',
+            'description'  => 'Dokan vendor subscription pack #' . $wp_product_id,
         ];
 
         $product_res = $this->post( '/products', $product_payload );
@@ -84,43 +79,29 @@ class Paddle_Client {
             ];
         }
 
-
-
-        // 2. Create recurring price
+        // 2. Create price. Paddle expects the amount in the lowest currency unit (cents).
         $price_payload = [
-            'description' => $name,
+            'description'   => $name,
             'product_id'    => $paddle_product_id,
             'name'          => $name,
             'unit_price'    => [
-                'amount'        => (String) $amount,
-                'currency_code' => "USD",
+                'amount'        => (string) (int) round( (float) $amount * 100 ),
+                'currency_code' => 'USD',
             ],
-            "tax_mode" => "account_setting",
+            'tax_mode'      => 'account_setting',
+            'billing_cycle' => $is_recurring ? [
+                'interval'  => (string) $interval_unit,
+                'frequency' => (int) $interval_count,
+            ] : null,
         ];
 
-        if($isrecurring){
-            
-            $price_payload['billing_cycle'] = [
-                'interval'  => (String) $interval_unit,
-                'frequency' => (int) $interval_count, 
+        if ( $has_trial ) {
+            $price_payload['trial_period'] = [
+                'interval'  => $trial_interval,
+                'frequency' => (int) $trial_freq,
             ];
-        
-            
-        }else{
-            
-            $price_payload['billing_cycle'] = null;
         }
-        
-        if($price_trail){
-            
-            $price_payload['trial_period']  = array("interval" => $price_trail_inerval, "frequency" => (int) $price_trail_freq);
 
-        }
-        
-        
-        // print_r($price_payload);
-        // die;
-        
         $price_res = $this->post( '/prices', $price_payload );
         if ( ! $price_res['success'] ) {
             return $price_res;
